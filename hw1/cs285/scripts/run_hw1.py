@@ -45,6 +45,7 @@ class BC_Trainer(object):
             initial_expertdata=self.params['expert_data'],
             collect_policy=self.rl_trainer.agent.actor,
             eval_policy=self.rl_trainer.agent.actor,
+            #eval_policy=self.loaded_expert_policy,
             relabel_with_expert=self.params['do_dagger'],
             expert_policy=self.loaded_expert_policy,
         )

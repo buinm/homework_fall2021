@@ -2,6 +2,7 @@ from cs285.infrastructure.replay_buffer import ReplayBuffer
 from cs285.policies.MLP_policy import MLPPolicySL
 from .base_agent import BaseAgent
 
+import torch
 
 class BCAgent(BaseAgent):
     def __init__(self, env, agent_params):
@@ -27,7 +28,11 @@ class BCAgent(BaseAgent):
     def train(self, ob_no, ac_na, re_n, next_ob_no, terminal_n):
         # training a BC agent refers to updating its actor using
         # the given observations and corresponding action labels
-        log = self.actor.update(ob_no, ac_na)  # HW1: you will modify this
+
+        # Inputs are numpy array, so we're converting them to pytorch tensor
+        ob_no_tensor = torch.from_numpy(ob_no).to(torch.float32)
+        ac_na_tensor = torch.from_numpy(ac_na).to(torch.float32)
+        log = self.actor.update(ob_no_tensor, ac_na_tensor)  # HW1: you will modify this
         return log
 
     def add_to_replay_buffer(self, paths):

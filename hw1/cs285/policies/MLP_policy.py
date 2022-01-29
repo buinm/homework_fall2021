@@ -81,7 +81,10 @@ class MLPPolicy(BasePolicy, nn.Module, metaclass=abc.ABCMeta):
             observation = obs[None]
 
         # TODO return the action that the policy prescribes
-        raise NotImplementedError
+        ob_no_tensor = torch.from_numpy(observation).to(torch.float32)
+        prediction = self.forward(ob_no_tensor)
+        action = prediction.sample((1,))
+        return ptu.to_numpy(action)
 
     # update/train this policy
     def update(self, observations, actions, **kwargs):
@@ -93,8 +96,17 @@ class MLPPolicy(BasePolicy, nn.Module, metaclass=abc.ABCMeta):
     # return more flexible objects, such as a
     # `torch.distributions.Distribution` object. It's up to you!
     def forward(self, observation: torch.FloatTensor) -> Any:
-        raise NotImplementedError
 
+        if self.discrete:
+            y = self.logits_na(observation)
+            m = nn.Softmax(dim=self.ac_dim)
+            return m(y)
+
+        # Return a distribution continuous case
+        y = self.mean_net(observation)
+        # This works because of broadcasting
+        gaussians = distributions.Normal(y, torch.exp(self.logstd))
+        return gaussians
 
 #####################################################
 #####################################################
@@ -109,7 +121,17 @@ class MLPPolicySL(MLPPolicy):
             adv_n=None, acs_labels_na=None, qvals=None
     ):
         # TODO: update the policy and return the loss
-        loss = TODO
+        pi_a_s = self.forward(observations)
+        loss = -pi_a_s.log_prob(actions).mean()
+        self.optimizer.zero_grad() # Reset the gradients
+
+        # Compute the partial derivatives, each parameter.grad() will be updated
+        loss.backward()
+
+        # Update/Modify the weights using the partial derivatives
+        self.optimizer.step()
+
+
         return {
             # You can add extra logging information here, but keep this line
             'Training Loss': ptu.to_numpy(loss),

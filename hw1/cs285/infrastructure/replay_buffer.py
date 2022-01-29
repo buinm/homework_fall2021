@@ -1,6 +1,5 @@
 from cs285.infrastructure.utils import *
 
-
 class ReplayBuffer(object):
 
     def __init__(self, max_size=1000000):
@@ -35,6 +34,7 @@ class ReplayBuffer(object):
             convert_listofrollouts(paths, concat_rew))
 
         if self.obs is None:
+            # Only takes the latest max_size rollouts
             self.obs = observations[-self.max_size:]
             self.acs = actions[-self.max_size:]
             self.rews = rewards[-self.max_size:]
@@ -76,8 +76,17 @@ class ReplayBuffer(object):
         ## HINT 1: use np.random.permutation to sample random indices
         ## HINT 2: return corresponding data points from each array (i.e., not different indices from each array)
         ## HINT 3: look at the sample_recent_data function below
+        random_indices = np.random.permutation(self.obs.shape[0])
+        assert len(random_indices) == self.obs.shape[0]
 
-        return TODO, TODO, TODO, TODO, TODO
+        old_indices = [i for i in range(self.obs.shape[0])]
+        self.obs[old_indices] = self.obs[random_indices]
+        self.acs[old_indices] = self.acs[random_indices]
+        self.rews[old_indices] = self.rews[random_indices]
+        self.next_obs[old_indices] = self.next_obs[random_indices]
+        self.terminals[old_indices] = self.terminals[random_indices]
+
+        return self.sample_recent_data(batch_size)
 
     def sample_recent_data(self, batch_size=1):
         return (
