@@ -98,9 +98,9 @@ class MLPPolicy(BasePolicy, nn.Module, metaclass=abc.ABCMeta):
     def forward(self, observation: torch.FloatTensor) -> Any:
 
         if self.discrete:
-            y = self.logits_na(observation)
-            m = nn.Softmax(dim=self.ac_dim)
-            return m(y)
+            logits = self.logits_na(observation)
+            action_distribution = distributions.Categorical(logits=logits)
+            return action_distribution
 
         # Return a distribution continuous case
         y = self.mean_net(observation)

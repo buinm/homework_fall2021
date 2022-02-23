@@ -86,7 +86,17 @@ class MLPPolicy(BasePolicy, nn.Module, metaclass=abc.ABCMeta):
 
     # query the policy with observation(s) to get selected action(s)
     def get_action(self, obs: np.ndarray) -> np.ndarray:
-        # TODO: get this from HW1
+        if len(obs.shape) > 1:
+            observation = obs
+        else:
+            observation = obs[None]
+
+        # TODO return the action that the policy prescribes
+        ob_no_tensor = torch.from_numpy(observation).to(torch.float32)
+        prediction = self.forward(ob_no_tensor)
+        action = prediction.sample()
+        return ptu.to_numpy(action)
+
 
     # update/train this policy
     def update(self, observations, actions, **kwargs):
@@ -123,9 +133,12 @@ class MLPPolicyPG(MLPPolicy):
         self.baseline_loss = nn.MSELoss()
 
     def update(self, observations, actions, advantages, q_values=None):
+        # Convert to torch's array
         observations = ptu.from_numpy(observations)
         actions = ptu.from_numpy(actions)
+        # print(advantages.dtype)
         advantages = ptu.from_numpy(advantages)
+        q_values   = ptu.from_numpy(q_values)
 
         # TODO: update the policy using policy gradient
         # HINT1: Recall that the expression that we want to MAXIMIZE
@@ -137,7 +150,16 @@ class MLPPolicyPG(MLPPolicy):
         # HINT4: use self.optimizer to optimize the loss. Remember to
             # 'zero_grad' first
 
-        TODO
+        policy = self.forward(observations)
+        loss   = -torch.mul(policy.log_prob(actions), advantages).mean()
+        self.optimizer.zero_grad() # Reset the gradients
+
+        # Compute the partial derivatives, each parameter.grad() will be updated
+        loss.backward()
+
+        # Update/Modify the weights using computed the partial derivatives
+        self.optimizer.step()
+
 
         if self.nn_baseline:
             ## TODO: update the neural network baseline using the q_values as
@@ -149,7 +171,16 @@ class MLPPolicyPG(MLPPolicy):
             ## HINT2: You will need to convert the targets into a tensor using
                 ## ptu.from_numpy before using it in the loss
 
-            TODO
+            V_pred = self.baseline(observations)
+            sq_loss = self.baseline_loss(V_pred, q_values)
+
+            # Reset the stored gradients
+            self.baseline_optimizer.zero_grad()
+
+            sq_loss.backward()
+
+            # Update/Modify the weights using computed the partial derivatives
+            self.baseline_optimizer.step()
 
         train_log = {
             'Training Loss': ptu.to_numpy(loss),
