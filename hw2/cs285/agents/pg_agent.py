@@ -125,7 +125,7 @@ class PGAgent(BaseAgent):
                         ## 0 otherwise.
                     ## HINT 2: self.gae_lambda is the lambda value in the
                         ## GAE formula
-                    if terminals[i] is True:
+                    if terminals[i] == 1:
                         delta = rews[i] - values[i] # State (i+1)th does not belong to this episode
                         advantages[i] = delta
                     else:
