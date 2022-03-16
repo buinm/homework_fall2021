@@ -26,7 +26,11 @@ class DQNCritic(BaseCritic):
 
         self.optimizer_spec = optimizer_spec
         network_initializer = hparams['q_func']
+
+        # Constant changing
         self.q_net = network_initializer(self.ob_dim, self.ac_dim)
+
+        # Slow-changing network
         self.q_net_target = network_initializer(self.ob_dim, self.ac_dim)
         self.optimizer = self.optimizer_spec.constructor(
             self.q_net.parameters(),
@@ -63,11 +67,14 @@ class DQNCritic(BaseCritic):
         reward_n = ptu.from_numpy(reward_n)
         terminal_n = ptu.from_numpy(terminal_n)
 
+        # Q(s) target network - updates constantly
         qa_t_values = self.q_net(ob_no)
+        # Q(s, a) where a is the input action ac_na
         q_t_values = torch.gather(qa_t_values, 1, ac_na.unsqueeze(1)).squeeze(1)
         
-        # TODO compute the Q-values from the target network 
-        qa_tp1_values = TODO
+        # TODO compute the Q-values from the target network
+        # Q'(s_{t+1})
+        qa_tp1_values = self.q_net_target(next_ob_no)
 
         if self.double_q:
             # You must fill this part for Q2 of the Q-learning portion of the homework.
@@ -75,14 +82,18 @@ class DQNCritic(BaseCritic):
             # is being updated, but the Q-value for this action is obtained from the
             # target Q-network. Please review Lecture 8 for more details,
             # and page 4 of https://arxiv.org/pdf/1509.06461.pdf is also a good reference.
-            TODO
+
+            # Use the target network Q(s) to find argmax_{a} Q(s_{t+1}, a)
+            a_idx = self.q_net(next_ob_no).argmax(dim=1)
+            # Plug in this action to compute target using Q'(s_{t+1}, a)
+            q_tp1 = torch.gather(qa_tp1_values, 1, a_idx.unsqueeze(1)).squeeze(1)
         else:
             q_tp1, _ = qa_tp1_values.max(dim=1)
 
         # TODO compute targets for minimizing Bellman error
         # HINT: as you saw in lecture, this would be:
             #currentReward + self.gamma * qValuesOfNextTimestep * (not terminal)
-        target = TODO
+        target = reward_n + self.gamma * q_tp1 * (terminal_n == 0)
         target = target.detach()
 
         assert q_t_values.shape == target.shape
