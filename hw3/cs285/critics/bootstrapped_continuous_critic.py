@@ -1,9 +1,9 @@
 from .base_critic import BaseCritic
 from torch import nn
 from torch import optim
+import torch
 
 from cs285.infrastructure import pytorch_util as ptu
-
 
 class BootstrappedContinuousCritic(nn.Module, BaseCritic):
     """
@@ -86,5 +86,32 @@ class BootstrappedContinuousCritic(nn.Module, BaseCritic):
         #       to 0) when a terminal state is reached
         # HINT: make sure to squeeze the output of the critic_network to ensure
         #       that its dimensions match the reward
+
+        # Convert to torch's array
+        ob_no = ptu.from_numpy(ob_no)
+        next_ob_no = ptu.from_numpy(next_ob_no)
+        ac_na = ptu.from_numpy(ac_na)
+        # print(advantages.dtype)
+        terminal_n = ptu.from_numpy(terminal_n)
+        reward_n = ptu.from_numpy(reward_n)
+
+        # print(type(ob_no))
+        for _ in range(self.num_target_updates):
+            V_s_prime = self.forward(next_ob_no)
+
+            with torch.no_grad(): # Disable auto_grad for the target
+                target = reward_n + self.gamma * V_s_prime * (1 - terminal_n)
+
+            for _ in range(self.num_grad_steps_per_target_update):
+                predict = self.forward(ob_no)
+                loss = self.loss(target, predict)
+
+                self.optimizer.zero_grad() # Reset the gradients
+
+                # Compute the partial derivatives, each parameter.grad() will be updated
+                loss.backward(retain_graph=True)
+
+                # Update/Modify the weights using computed the partial derivatives
+                self.optimizer.step()
 
         return loss.item()
