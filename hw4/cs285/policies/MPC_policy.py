@@ -60,6 +60,7 @@ class MPCPolicy(BasePolicy):
             # Begin with randomly selected actions, then refine the sampling distribution
             # iteratively as described in Section 3.3, "Iterative Random-Shooting with Refinement" of
             # https://arxiv.org/pdf/1909.11652.pdf
+
             for i in range(self.cem_iterations):
                 # - Sample candidate sequences from a Gaussian with the current
                 #   elite mean and variance
@@ -69,11 +70,26 @@ class MPCPolicy(BasePolicy):
                 #     (Hint: what existing function can we use to compute rewards for
                 #      our candidate sequences in order to rank them?)
                 # - Update the elite mean and variance
-                pass
+                if i == 0:
+                    candidate_action_seq = np.random.rand(num_sequences, horizon, self.ac_dim) * (self.high - self.low) + self.low
+                    mu = np.mean(candidate_action_seq, axis=0)
+                    std = np.std(candidate_action_seq, axis=0)
+                else:
+                    # Sample from elite means and variance
+                    candidate_action_seq = np.random.normal(mu, std, size=(self.N, horizon, self.ac_dim))
+                cul_rews = self.evaluate_candidate_sequences(candidate_action_seq, obs)
+                elites_idx = np.argsort(cul_rews)[-self.cem_num_elites:]
+
+                # Update elites distribution
+                mu = self.cem_alpha * np.mean(candidate_action_seq[elites_idx], axis=0) + \
+                            (1-self.cem_alpha) * mu
+                std = self.cem_alpha * np.std(candidate_action_seq[elites_idx], axis=0) + \
+                             (1-self.cem_alpha) * std
+
 
             # TODO(Q5): Set `cem_action` to the appropriate action sequence chosen by CEM.
             # The shape should be (horizon, self.ac_dim)
-            cem_action = None
+            cem_action = mu
 
             return cem_action[None]
         else:
@@ -143,7 +159,6 @@ class MPCPolicy(BasePolicy):
 
         # Making use of broadcasting to copying values of curr_obs to other dimensions
         curr_obs = np.expand_dims(obs, 0) + np.zeros((self.N, self.ob_dim))
-        print(self.ac_dim)
         for i in range(self.horizon):
             actions = candidate_action_sequences[:, i, :]
             sum_of_rewards += self.env.get_reward(curr_obs, actions)[0]
