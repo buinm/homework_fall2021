@@ -48,7 +48,7 @@ class CQLCritic(BaseCritic):
 
         qa_t_values = self.q_net(ob_no)
         q_t_values = torch.gather(qa_t_values, 1, ac_na.unsqueeze(1)).squeeze(1)
-        qa_tp1_values = self.q_net_target(ob_no)
+        qa_tp1_values = self.q_net_target(next_ob_no)
 
         if self.double_q:
             next_actions = self.q_net(next_ob_no).argmax(dim=1)
@@ -93,7 +93,8 @@ class CQLCritic(BaseCritic):
         # CQL Implementation
         # TODO: Implement CQL as described in the pdf and paper
         # Hint: After calculating cql_loss, augment the loss appropriately
-        q_t_logsumexp = torch.log(torch.sum(torch.exp(qa_t_values)))
+        #q_t_logsumexp = torch.log(torch.sum(torch.exp(qa_t_values)))
+        q_t_logsumexp = qa_t_values.logsumexp(dim=1)
         cql_loss = self.cql_alpha * torch.mean(q_t_logsumexp - q_t_values) + loss
 
         cql_loss.backward()
