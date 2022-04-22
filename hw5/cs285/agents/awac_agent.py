@@ -56,24 +56,34 @@ class AWACAgent(DQNAgent):
 
     def estimate_advantage(self, ob_no, ac_na, re_n, next_ob_no, terminal_n, n_actions=10):
         # TODO convert to torch tensors
+        re_n = ptu.from_numpy(re_n)
 
         vals = []
         # TODO Calculate Value Function Estimate given current observation
         # You may find it helpful to utilze get_qvals defined above
-        dist_ob_no = ptu.to_numpy(self.awac_actor.forward(ob_no))
-        next_dist_ob_no = ptu.to_numpy(self.awac_actor.forward(next_ob_no))
-        V_pi_s = 0
-        V_pi_sPrime = 0
+        #dist_ob_no = ptu.to_numpy(self.awac_actor.forward(ob_no))
+        #next_dist_ob_no = ptu.to_numpy(self.awac_actor.forward(next_ob_no))
+
+        Q_sa = self.get_qvals(self.exploitation_critic, ob_no, ac_na)
+        V_pi = 0
         if self.agent_params['discrete']:
+            # V is just expected value of Q(s,a) with a ~ pi(a|s)
             for i in range(self.agent_params['ac_dim']):
-                V_pi_s += self.get_qvals(self.exploitation_critic, ob_no, i) * dist_ob_no[i]
-                V_pi_sPrime += self.get_qvals(self.exploitation_critic, next_ob_no, i) * next_dist_ob_no[i]
+                AC = i * np.ones((ac_na.shape), dtype=int)
+                V_pi += self.get_qvals(self.exploitation_critic, next_ob_no, AC)
+            # Approximate expected value with average
+            V_pi /= self.agent_params['ac_dim']
         else:
             print("Oh no")
+            sum_VpiS = 0
+            sum_VpiSprime = 0
             for _ in range(n_actions):
+                # Just sample some action
+                # sample_a = self.awac_actor.get_action(ob_no)
+                # sum_VpiS += self.get_qvals(self.exploitation_critic, ob_no, a)
                 pass
 
-        return (re_n + V_pi_sPrime - V_pi_s)
+        return (Q_sa - V_pi)
 
     def train(self, ob_no, ac_na, re_n, next_ob_no, terminal_n):
         log = {}
@@ -122,7 +132,7 @@ class AWACAgent(DQNAgent):
             # 1): Estimate the advantage
             Adv = self.estimate_advantage(ob_no, ac_na, re_n, next_ob_no, terminal_n)
             # 2): Calculate the awac actor loss
-            self.awac_actor.update(ob_no, ac_na, Adv)
+            actor_loss = self.awac_actor.update(ob_no, ac_na, Adv)
 
             # TODO: Update Target Networks #
             if self.num_param_updates % self.target_update_freq == 0:
